@@ -132,6 +132,6 @@ print(samp_mask)
 survey_chorus_smoothed[samp_mask] = np.nan
 
 # CHORUS OCCURRENCE (chorus events/all events)
-
+plus = 1
 survey_chorus_occurrence = survey_chorus_smoothed/survey_samp_smoothed
 
