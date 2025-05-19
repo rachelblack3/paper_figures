@@ -59,6 +59,20 @@ def string_to_float_list(s):
     return [float(x) for x in s.split() if x]
 
 
+def make_histogram_da(dataframe):
+    
+    # define spatial bins: 0.1 L and 0.25 MLT bins
+    rbins = np.linspace(0,7, 71,endpoint=True)
+    abins = np.linspace(0,2*np.pi, 25, endpoint=True)
+    A, R = np.meshgrid(abins, rbins)
+
+
+    # find BURST histogram first
+    mlt_l_array = np.array(list(zip(dataframe['MLT_rads'], dataframe['Lstar'])))
+    #calculate histogram
+    hist,_,_ = np.histogram2d(mlt_l_array[:,0],mlt_l_array[:,1],bins=(abins, rbins))
+
+    return hist
 
 def make_histogram(dataframe):
     
@@ -132,6 +146,59 @@ print(samp_mask)
 survey_chorus_smoothed[samp_mask] = np.nan
 
 # CHORUS OCCURRENCE (chorus events/all events)
-plus = 1
 survey_chorus_occurrence = survey_chorus_smoothed/survey_samp_smoothed
+
+
+
+# Now doing burst
+burst = xr.open_dataset('/data/emfisis_burst/wip/rablack75/rablack75/CountBurst/CSVs_flashA/curr_combined/full_13_18.nc')
+
+# create AE and plasmapause filters
+burst_low = burst.where(burst["AE"]<100)
+burst_medium= burst.where((burst["AE"]>=100)&(burst["AE"]<300))
+data_high =burst.where(burst["AE"]>=300)
+
+# change MLT to radians for binning in polar coords
+burst["MLT_rads"] = 2*np.pi*burst["MLT"]/24
+
+# SAMPLING
+# make histogram
+burst_samp_hist = make_histogram_da(burst)
+
+# remove zeroes
+zero_mask = burst_samp_hist == 0
+burst_samp_hist[zero_mask]=np.nan
+
+# Kaine's smoothing technique
+burst_samp_smoothed = np.zeros((24*10,70))
+for i in range(24):
+    burst_samp_smoothed[i*10:(i+1)*10,:] = burst_samp_hist[i,:]
+
+
+# CHORUS EVENTS
+# make histogram
+burst_chorus_hist = make_histogram_da(burst[(burst["chorus_pos"]==True) & (burst["Plasmapause"]=="Out") & (burst["Lstar"]>2.)])
+
+# remove zeroes
+zero_mask = burst_chorus_hist == 0
+burst_chorus_hist[zero_mask]=np.nan
+
+# Kaine's smoothing technique
+burst_chorus_smoothed = np.zeros((24*10,70))
+for i in range(24):
+    burst_chorus_smoothed[i*10:(i+1)*10,:] = burst_chorus_hist[i,:]
+
+
+# CHORUS OCCURRENCE (chorus events/all events)
+burst_chorus_occurrence = burst_chorus_smoothed/burst_samp_smoothed
+
+
+# BURST/SURVEY COMPARISONS
+#1. SAMPLING
+burst_survey_sampling = burst_samp_smoothed/survey_samp_smoothed
+
+#2. CHORUS OCCURRENCE
+burst_survey_chorus = burst_chorus_smoothed/survey_chorus_smoothed
+
+# plot all 6
 
