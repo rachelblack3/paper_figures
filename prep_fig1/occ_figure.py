@@ -341,7 +341,7 @@ plt.style.use("ggplot")
 fig, axes = plt.subplots(2, 3, subplot_kw={'projection': 'polar'}, figsize=(12, 4)) 
 title = 'Fraction of burst-mode triggers to total survey time'
 
-title='a) survey sampling'
+title='a) Survey'
 axis = axes[0,0]
 axis.set_title(title,loc='left',fontsize=14)
 sampling_norm = mcolors.LogNorm(vmin=10**(2), vmax=10**(5))
@@ -350,7 +350,7 @@ dial_plot = make_multiple_dial_plot(axis,survey_samp_smoothed,sampling_norm,titl
 
 axis.set_xticklabels([str(i) if (i==18 or i == 12 or i ==6) else '' for i in range(0,24)],fontsize=14)
 
-title = 'b) burst sampling'
+title = 'b) Burst'
 
 axis = axes[0,1]
 axis.set_title(title,loc='left',fontsize=14)
@@ -359,7 +359,7 @@ axis.set_xticklabels([str(i) if (i ==6 or i==18) else '' for i in range(0,24)],f
 # add in the mean power plot
 
 
-title = 'c) burst/survey sampling'
+title = 'c) Burst/Survey'
 
 ratio_norm = mcolors.LogNorm(vmin=10**(-2), vmax=10**(0))
 axis = axes[0,2]
@@ -368,33 +368,25 @@ dial_plot = make_multiple_rel_dial_plot(axis,burst_survey_sampling,ratio_norm,ti
 axis.set_xticklabels([str(i) if (i ==6 or i==18 or i==0) else '' for i in range(0,24)],fontsize=14)
 
 
-title='d) chorus occurrence in survey'
+
 axis = axes[1,0]
-axis.set_title(title,loc='left',fontsize=14)
 chorus_norm = mcolors.LogNorm(vmin=10**(-2), vmax=10**(0))
 dial_plot = make_multiple_dial_plot(axis,survey_chorus_occurrence,chorus_norm,title)
 # first burst plot has 12 and 18 only
 
 axis.set_xticklabels([str(i) if (i==18 or i == 12 or i ==6) else '' for i in range(0,24)],fontsize=14)
 
-title = 'e) chorus occurrence in burst'
 
 axis = axes[1,1]
-axis.set_title(title,loc='left',fontsize=14)
 dial_plot = make_multiple_dial_plot(axis,burst_chorus_occurrence,chorus_norm,title)
 axis.set_xticklabels([str(i) if (i ==6 or i==18) else '' for i in range(0,24)],fontsize=14)
 # add in the mean power plot
 
 
-title = 'f) burst/survey chorus occurrence'
-
 ratio_norm = mcolors.LogNorm(vmin=10**(-2), vmax=10**(0))
 axis = axes[1,2]
-axis.set_title(title,loc='left',fontsize=14)
 dial_plot = make_multiple_rel_dial_plot(axis,burst_survey_chorus,ratio_norm,title)
 axis.set_xticklabels([str(i) if (i ==6 or i==18 or i==0) else '' for i in range(0,24)],fontsize=14)
-
-
 
 fig.savefig('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/fig1V1.png')
 

@@ -115,77 +115,126 @@ def make_multiple_rel_dial_plot(ax,histogram,colorbar,title):
     ax.add_patch(semicircle_black)
    
 
-# Read the array from disk
+# Read the array from file
 read_data = np.loadtxt('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/data_fig1/test.txt')
 read_data = read_data.reshape((6,24*10,70))
 
 survey_samp_smoothed = read_data[0,:,:]
 burst_samp_smoothed = read_data[1,:,:]
 burst_survey_sampling = read_data[2,:,:]
-survey_chorus_occurrence = read_data[3,:,:]
-burst_chorus_occurrence = read_data[4,:,:]
+survey_chorus_occurrence = read_data[3,:,:]/read_data[0,:,:]
+burst_chorus_occurrence = read_data[4,:,:]/read_data[1,:,:]
 burst_survey_chorus = read_data[5,:,:]
 
 # plot dial plot
 print("starting plot...")
 plt.style.use("ggplot")
-fig, axes = plt.subplots(2, 3, subplot_kw={'projection': 'polar'}, figsize=(12, 4)) 
-title = 'Fraction of burst-mode triggers to total survey time'
+fig, axes = plt.subplots(2, 3, subplot_kw={'projection': 'polar'}, figsize=(10, 6)) 
 
-title='a) survey sampling'
+title='a) Survey'
 axis = axes[0,0]
-axis.set_title(title,loc='left',fontsize=14)
+axis.set_title(title,loc='center',fontsize=14)
 sampling_norm = mcolors.LogNorm(vmin=10**(2), vmax=10**(5))
 dial_plot = make_multiple_dial_plot(axis,survey_samp_smoothed,sampling_norm,title)
 # first burst plot has 12 and 18 only
 
-axis.set_xticklabels([str(i) if (i==18 or i == 12 or i ==6) else '' for i in range(0,24)],fontsize=14)
+axis.set_xticklabels([str(i) if (i==18 or i == 12) else '' for i in range(0,24)],fontsize=14)
+box1 = axes[0,0].get_position()
+axes[0,0].set_position([box1.x0 - 0.1, box1.y0, box1.width, box1.height])
 
-title = 'b) burst sampling'
-
+title = 'b) Burst'
 axis = axes[0,1]
-axis.set_title(title,loc='left',fontsize=14)
+axis.set_title(title,loc='center',fontsize=14)
 dial_plot = make_multiple_dial_plot(axis,burst_samp_smoothed,sampling_norm,title)
-axis.set_xticklabels([str(i) if (i ==6 or i==18) else '' for i in range(0,24)],fontsize=14)
+axis.set_xticklabels([str(i) if (i == 12) else '' for i in range(0,24)],fontsize=14)
 # add in the mean power plot
+# Manually move burst left, closer to survey
+box2 = axes[0,1].get_position()
+axes[0,1].set_position([box2.x0 - 0.14, box2.y0, box2.width, box2.height])
 
-
-title = 'c) burst/survey sampling'
+title = 'c) Burst/Survey'
 
 ratio_norm = mcolors.LogNorm(vmin=10**(-2), vmax=10**(0))
 axis = axes[0,2]
-axis.set_title(title,loc='left',fontsize=14)
+axis.set_title(title,loc='center',fontsize=14)
 dial_plot = make_multiple_rel_dial_plot(axis,burst_survey_sampling,ratio_norm,title)
-axis.set_xticklabels([str(i) if (i ==6 or i==18 or i==0) else '' for i in range(0,24)],fontsize=14)
+axis.set_xticklabels([str(i) if (i ==6 or i==12) else '' for i in range(0,24)],fontsize=14)
 
-
-title='d) chorus occurrence in survey'
 axis = axes[1,0]
-axis.set_title(title,loc='left',fontsize=14)
 chorus_norm = mcolors.LogNorm(vmin=10**(-2), vmax=10**(0))
 dial_plot = make_multiple_dial_plot(axis,survey_chorus_occurrence,chorus_norm,title)
 # first burst plot has 12 and 18 only
 
-axis.set_xticklabels([str(i) if (i==18 or i == 12 or i ==6) else '' for i in range(0,24)],fontsize=14)
+axis.set_xticklabels([str(i) if (i==18 or i ==0) else '' for i in range(0,24)],fontsize=14)
+box2 = axes[1,0].get_position()
+axes[1,0].set_position([box2.x0 - 0.1, box2.y0, box2.width, box2.height])
 
-title = 'e) chorus occurrence in burst'
 
 axis = axes[1,1]
-axis.set_title(title,loc='left',fontsize=14)
 dial_plot = make_multiple_dial_plot(axis,burst_chorus_occurrence,chorus_norm,title)
-axis.set_xticklabels([str(i) if (i ==6 or i==18) else '' for i in range(0,24)],fontsize=14)
+axis.set_xticklabels([str(i) if (i ==0) else '' for i in range(0,24)],fontsize=14)
 # add in the mean power plot
-
-
-title = 'f) burst/survey chorus occurrence'
+# Manually move burst left, closer to survey
+box4 = axes[1,1].get_position()
+axes[1,1].set_position([box4.x0 - 0.14, box4.y0, box4.width, box4.height])
 
 ratio_norm = mcolors.LogNorm(vmin=10**(-2), vmax=10**(0))
 axis = axes[1,2]
-axis.set_title(title,loc='left',fontsize=14)
 dial_plot = make_multiple_rel_dial_plot(axis,burst_survey_chorus,ratio_norm,title)
-axis.set_xticklabels([str(i) if (i ==6 or i==18 or i==0) else '' for i in range(0,24)],fontsize=14)
+axis.set_xticklabels([str(i) if (i ==6 or i==0) else '' for i in range(0,24)],fontsize=14)
+# Manually move burst left, closer to survey
+box5 = axes[0,2].get_position()
+axes[0,2].set_position([box5.x0 - 0.05, box5.y0, box5.width, box5.height])
+box5 = axes[1,2].get_position()
+axes[1,2].set_position([box5.x0 - 0.05, box5.y0, box5.width, box5.height])
+
+# Add in the colorbars again
+
+# Add a separate axis for the color bar of the SAMPLING
+sm = plt.cm.ScalarMappable(cmap='jet', norm=mcolors.LogNorm(1e2,1e5))
+sm.set_array([])  # Required for the colorbar to work properly
+cbar_ax = fig.add_axes([0.5, 0.55, 0.05, 0.3])  # [left, bottom, width, height]
+#Make the axes invisible
+for spine in cbar_ax.spines.values():
+    spine.set_visible(False)
+cbar_ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+# Add the color bar to the figure
+#
+cbar=fig.colorbar(sm, ax=cbar_ax, orientation='vertical', fraction=0.5, pad=0.1)
+cbar.ax.tick_params(labelsize=14)  # Set colorbar tick label font size
+cbar.set_label(r'$N_{burst,survey}$', fontsize=14) 
+
+# add seperate axis for colorbar of chorus occurrence
+sm = plt.cm.ScalarMappable(cmap='jet', norm=mcolors.LogNorm(1e-2,1e0))
+sm.set_array([])  # Required for the colorbar to work properly
+cbar_ax = fig.add_axes([0.5, 0.15, 0.05, 0.3])  # [left, bottom, width, height]
+#Make the axes invisible
+for spine in cbar_ax.spines.values():
+    spine.set_visible(False)
+cbar_ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+# Add the color bar to the figure
+#
+cbar=fig.colorbar(sm, ax=cbar_ax, orientation='vertical', fraction=0.5, pad=0.1)
+cbar.ax.tick_params(labelsize=14)  # Set colorbar tick label font size
+cbar.set_label(r'$Occurrence_{burst,survey}$', fontsize=14)
+
+# Add a separate axis for the color bar of the FRACTION
+
+sm = plt.cm.ScalarMappable(cmap='Greens', norm=mcolors.LogNorm(1e-2,1e0))
+sm.set_array([])  # Required for the colorbar to work properly
+cbar_ax2 = fig.add_axes([0.875, 0.37, 0.05, 0.3])  # [left, bottom, width, height]
+# Make the axes invisible
+for spine in cbar_ax2.spines.values():
+    spine.set_visible(False)
+cbar_ax2.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
+# Add the color bar to the figure
+cbar2=fig.colorbar(sm, ax=cbar_ax2, orientation='vertical', fraction=0.5, pad=0.05,ticks=[0.01,1,100])
+cbar2.ax.tick_params(labelsize=14)  # Set colorbar tick label font size
+cbar2.set_label(r'$N_{burst}/N_{survey}$', fontsize=14)
 
 
+
+print("saving plot...")
 
 fig.savefig('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/fig1V1.png')
 
