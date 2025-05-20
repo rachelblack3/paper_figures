@@ -312,6 +312,27 @@ burst_survey_sampling = burst_samp_smoothed/survey_samp_smoothed
 #2. CHORUS OCCURRENCE
 burst_survey_chorus = burst_chorus_smoothed/survey_chorus_smoothed
 
+dists = [survey_samp_smoothed,burst_samp_smoothed,burst_survey_sampling,survey_chorus_smoothed,burst_chorus_smoothed,burst_survey_chorus]
+names = ["Survey sampling","Burst sampling","Burst/survey sampling","Survey chorus","Burst chorus","Burst/survey chorus"]
+# save all data to a file so we can fix the plotting faster 
+# Write the array to disk
+with open('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/data_fig1/test.txt', 'w') as outfile:
+    # I'm writing a header here just for the sake of readability
+    # Any line starting with "#" will be ignored by numpy.loadtxt
+    outfile.write('# Array shape: {0}\n'.format(burst_samp_smoothed.shape))
+    
+    # Iterating through a ndimensional array produces slices along
+    # the last axis. This is equivalent to data[i,:,:] in this case
+    for dist,name in zip(dists,names):
+
+        # The formatting string indicates that I'm writing out
+        # the values in left-justified columns 7 characters in width
+        # with 2 decimal places.  
+        np.savetxt(outfile, dist, fmt='%-7.2f')
+
+        # Writing out a break to indicate different dists...
+        outfile.write(f'{name}')
+
 # plot all 6
 
 # plot dial plot
