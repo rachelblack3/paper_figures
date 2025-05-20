@@ -242,11 +242,11 @@ for i in range(24):
     survey_chorus_smoothed[i*10:(i+1)*10,:] = survey_chorus_hist[i,:]
 
 # also remove bins for which there was low sampling for survey, which would skew the statistics. We have chosen 1000 samples as lowest
-samp_mask =  (survey_chorus_smoothed < 0.1*np.nanmedian(survey_chorus_smoothed))
+samp_mask_survey =  (survey_chorus_smoothed < 0.1*np.nanmedian(survey_chorus_smoothed))
 # Print the inf mask
 print("\nLow sampling bin mask:")
-print(samp_mask)
-survey_chorus_smoothed[samp_mask] = np.nan
+print(samp_mask_survey)
+survey_chorus_smoothed[samp_mask_survey] = np.nan
 
 print("survey dists made...")
 
@@ -287,7 +287,7 @@ for i in range(24):
 
 # CHORUS EVENTS
 # make histogram
-burst_chorus_hist = make_histogram_da(burst[(burst["isChorus"]==True) & (burst["Plasmapause"]=="Out") & (burst["Lstar"]>2.)])
+burst_chorus_hist = make_histogram_da(burst.where((burst["isChorus"]==True) & (burst["Lstar"]>2.)))
 print("burst chorus histogram made...")
 
 # remove zeroes
@@ -299,6 +299,7 @@ burst_chorus_smoothed = np.zeros((24*10,70))
 for i in range(24):
     burst_chorus_smoothed[i*10:(i+1)*10,:] = burst_chorus_hist[i,:]
 
+burst_chorus_smoothed[samp_mask_survey] = np.nan
 
 # CHORUS OCCURRENCE (chorus events/all events)
 burst_chorus_occurrence = burst_chorus_smoothed/burst_samp_smoothed
@@ -316,7 +317,7 @@ burst_survey_chorus = burst_chorus_smoothed/survey_chorus_smoothed
 # plot dial plot
 print("starting plot...")
 plt.style.use("ggplot")
-fig, axes = plt.subplots(2, 3, subplot_kw={'projection': 'polar'}, figsize=(4, 12)) 
+fig, axes = plt.subplots(2, 3, subplot_kw={'projection': 'polar'}, figsize=(12, 4)) 
 title = 'Fraction of burst-mode triggers to total survey time'
 
 title='a) survey sampling'
@@ -372,35 +373,6 @@ axis.set_title(title,loc='left',fontsize=14)
 dial_plot = make_multiple_rel_dial_plot(axis,burst_survey_chorus,ratio_norm,title)
 axis.set_xticklabels([str(i) if (i ==6 or i==18 or i==0) else '' for i in range(0,24)],fontsize=14)
 
-
-
-# Add a separate axis for the color bar of the SAMPLING
-sm = plt.cm.ScalarMappable(cmap='jet', norm=mcolors.LogNorm(1e2,1e5))
-sm.set_array([])  # Required for the colorbar to work properly
-cbar_ax = fig.add_axes([0.65, 0.6, 0.05, 0.2])  # [left, bottom, width, height]
-#Make the axes invisible
-for spine in cbar_ax.spines.values():
-    spine.set_visible(False)
-cbar_ax.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
-# Add the color bar to the figure
-#
-cbar=fig.colorbar(sm, ax=cbar_ax, orientation='vertical', fraction=0.5, pad=0.1)
-cbar.ax.tick_params(labelsize=14)  # Set colorbar tick label font size
-cbar.set_label(r'$N_{burst,survey}$', fontsize=14) 
-
-
-# Add a separate axis for the color bar of the RATIO
-sm = plt.cm.ScalarMappable(cmap='Greens', norm=mcolors.LogNorm(1e-2,1e0))
-sm.set_array([])  # Required for the colorbar to work properly
-cbar_ax2 = fig.add_axes([0.95, 0.6, 0.05, 0.2])  # [left, bottom, width, height]
-# Make the axes invisible
-for spine in cbar_ax2.spines.values():
-    spine.set_visible(False)
-cbar_ax2.tick_params(left=False, bottom=False, labelleft=False, labelbottom=False)
-# Add the color bar to the figure
-cbar2=fig.colorbar(sm, ax=cbar_ax2, orientation='vertical', fraction=0.5, pad=0.05,ticks=[0.01,1,100])
-cbar2.ax.tick_params(labelsize=14)  # Set colorbar tick label font size
-cbar2.set_label(r'$N_{burst}/N_{survey}$', fontsize=14)
 
 
 fig.savefig('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/fig1V1.png')
