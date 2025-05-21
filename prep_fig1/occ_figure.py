@@ -212,7 +212,7 @@ time_condition = (survey["Timestamp"] > datetime(year=2012,month=12,day=31)) & (
 survey = survey[time_condition]
 
 # also put in an MLAT rnge
-MLAT_condition = np.abs(survey["MLAT"])>=6.
+MLAT_condition = np.abs(survey["MLAT"])<6.
 
 survey = survey[MLAT_condition]
 
@@ -274,7 +274,7 @@ print("burst loaded...")
 #data_high =burst.where(burst["AE"]>=300)
 
 # Adding in MLAT range
-burst = burst.where(np.abs(burst["MLAT"])>=6.)
+burst = burst.where(np.abs(burst["MLAT"])<6.)
 # change MLT to radians for binning in polar coords
 burst["MLT_rads"] = 2*np.pi*burst["MLT"]/24
 
@@ -325,7 +325,7 @@ names = ["Survey sampling","Burst sampling","Burst/survey sampling","Survey chor
 # save all data to a file so we can fix the plotting faster 
 # Write the array to disk
 print("saving data...")
-with open('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/data_fig1/HighMLATdata.txt', 'w') as outfile:
+with open('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/data_fig1/LowMLATdata.txt', 'w') as outfile:
     # I'm writing a header here just for the sake of readability
     # Any line starting with "#" will be ignored by numpy.loadtxt
     outfile.write(f'# arrays are: {names[:]}')
