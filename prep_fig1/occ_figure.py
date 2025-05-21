@@ -211,6 +211,11 @@ survey_high =survey[(survey["AE"]>=300)]
 time_condition = (survey["Timestamp"] > datetime(year=2012,month=12,day=31)) & (survey["Timestamp"] < datetime(year=2019,month=1,day=1))
 survey = survey[time_condition]
 
+# also put in an MLAT rnge
+MLAT_condition = np.abs(survey["MLAT"])>=6.
+
+survey = survey[MLAT_condition]
+
 # SAMPLING
 # make histogram
 survey_samp_hist = make_histogram(survey)
@@ -268,6 +273,8 @@ print("burst loaded...")
 #burst_medium= burst.where((burst["AE"]>=100)&(burst["AE"]<300))
 #data_high =burst.where(burst["AE"]>=300)
 
+# Adding in MLAT range
+burst = burst.where(np.abs(burst["MLAT"])>=6.)
 # change MLT to radians for binning in polar coords
 burst["MLT_rads"] = 2*np.pi*burst["MLT"]/24
 
@@ -284,6 +291,7 @@ burst_samp_smoothed = np.zeros((24*10,70))
 for i in range(24):
     burst_samp_smoothed[i*10:(i+1)*10,:] = burst_samp_hist[i,:]
 
+burst_samp_smoothed[samp_mask] = np.nan
 
 # CHORUS EVENTS
 # make histogram
@@ -316,10 +324,11 @@ dists = [survey_samp_smoothed,burst_samp_smoothed,burst_survey_sampling,survey_c
 names = ["Survey sampling","Burst sampling","Burst/survey sampling","Survey chorus","Burst chorus","Burst/survey chorus"]
 # save all data to a file so we can fix the plotting faster 
 # Write the array to disk
-with open('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/data_fig1/test.txt', 'w') as outfile:
+print("saving data...")
+with open('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/data_fig1/HighMLATdata.txt', 'w') as outfile:
     # I'm writing a header here just for the sake of readability
     # Any line starting with "#" will be ignored by numpy.loadtxt
-    outfile.write('# Array shape: {0}\n'.format(burst_samp_smoothed.shape))
+    outfile.write(f'# arrays are: {names[:]}')
     
     # Iterating through a ndimensional array produces slices along
     # the last axis. This is equivalent to data[i,:,:] in this case
@@ -331,62 +340,4 @@ with open('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/
         np.savetxt(outfile, dist, fmt='%-7.2f')
 
         # Writing out a break to indicate different dists...
-        outfile.write(f'{name}')
-
-# plot all 6
-
-# plot dial plot
-print("starting plot...")
-plt.style.use("ggplot")
-fig, axes = plt.subplots(2, 3, subplot_kw={'projection': 'polar'}, figsize=(12, 4)) 
-title = 'Fraction of burst-mode triggers to total survey time'
-
-title='a) Survey'
-axis = axes[0,0]
-axis.set_title(title,loc='left',fontsize=14)
-sampling_norm = mcolors.LogNorm(vmin=10**(2), vmax=10**(5))
-dial_plot = make_multiple_dial_plot(axis,survey_samp_smoothed,sampling_norm,title)
-# first burst plot has 12 and 18 only
-
-axis.set_xticklabels([str(i) if (i==18 or i == 12 or i ==6) else '' for i in range(0,24)],fontsize=14)
-
-title = 'b) Burst'
-
-axis = axes[0,1]
-axis.set_title(title,loc='left',fontsize=14)
-dial_plot = make_multiple_dial_plot(axis,burst_samp_smoothed,sampling_norm,title)
-axis.set_xticklabels([str(i) if (i ==6 or i==18) else '' for i in range(0,24)],fontsize=14)
-# add in the mean power plot
-
-
-title = 'c) Burst/Survey'
-
-ratio_norm = mcolors.LogNorm(vmin=10**(-2), vmax=10**(0))
-axis = axes[0,2]
-axis.set_title(title,loc='left',fontsize=14)
-dial_plot = make_multiple_rel_dial_plot(axis,burst_survey_sampling,ratio_norm,title)
-axis.set_xticklabels([str(i) if (i ==6 or i==18 or i==0) else '' for i in range(0,24)],fontsize=14)
-
-
-
-axis = axes[1,0]
-chorus_norm = mcolors.LogNorm(vmin=10**(-2), vmax=10**(0))
-dial_plot = make_multiple_dial_plot(axis,survey_chorus_occurrence,chorus_norm,title)
-# first burst plot has 12 and 18 only
-
-axis.set_xticklabels([str(i) if (i==18 or i == 12 or i ==6) else '' for i in range(0,24)],fontsize=14)
-
-
-axis = axes[1,1]
-dial_plot = make_multiple_dial_plot(axis,burst_chorus_occurrence,chorus_norm,title)
-axis.set_xticklabels([str(i) if (i ==6 or i==18) else '' for i in range(0,24)],fontsize=14)
-# add in the mean power plot
-
-
-ratio_norm = mcolors.LogNorm(vmin=10**(-2), vmax=10**(0))
-axis = axes[1,2]
-dial_plot = make_multiple_rel_dial_plot(axis,burst_survey_chorus,ratio_norm,title)
-axis.set_xticklabels([str(i) if (i ==6 or i==18 or i==0) else '' for i in range(0,24)],fontsize=14)
-
-fig.savefig('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/fig1V1.png')
-
+        #outfile.write(f'{name}')

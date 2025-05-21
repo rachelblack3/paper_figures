@@ -116,7 +116,7 @@ def make_multiple_rel_dial_plot(ax,histogram,colorbar,title):
    
 
 # Read the array from file
-read_data = np.loadtxt('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/data_fig1/test.txt')
+read_data = np.loadtxt('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/data_fig1/HighMLATdata.txt')
 read_data = read_data.reshape((6,24*10,70))
 
 survey_samp_smoothed = read_data[0,:,:]
@@ -236,5 +236,5 @@ cbar2.set_label(r'$N_{burst}/N_{survey}$', fontsize=14)
 
 print("saving plot...")
 
-fig.savefig('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/fig1V1.png')
+fig.savefig('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/fig1_HighLat_V1.png')
 
