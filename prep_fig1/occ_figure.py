@@ -202,17 +202,12 @@ survey["Timestamp"] = survey["Timestamp"].apply(lambda x: datetime.strptime(x, '
 survey["MLT_rads"] = 2*np.pi*survey["MLT"]/24
 print("survey time and MLT loaded...")
 
-# create AE and plasmapause filters
-survey_low = survey[(survey["AE"]<100)]
-survey_medium = survey[(survey["AE"]>=100)&(survey["AE"]<300)]
-survey_high =survey[(survey["AE"]>=300)]
-
 # keep only between 2013-2019 for now
-time_condition = (survey["Timestamp"] > datetime(year=2012,month=12,day=31)) & (survey["Timestamp"] < datetime(year=2019,month=1,day=1))
+time_condition = (survey["Timestamp"] > datetime(year=2012,month=12,day=31)) & (survey["Timestamp"] < datetime(year=2019,month=12,day=30))
 survey = survey[time_condition]
 
 # also put in an MLAT rnge
-MLAT_condition = np.abs(survey["MLAT"])<6.
+MLAT_condition = np.abs(survey["MLAT"])>=6.
 
 survey = survey[MLAT_condition]
 
@@ -220,38 +215,28 @@ survey = survey[MLAT_condition]
 # make histogram
 survey_samp_hist = make_histogram(survey)
 # remove zeroes
-zero_mask = survey_samp_hist == 0
-survey_samp_hist[zero_mask]=np.nan
+survey_samp_mask = survey_samp_hist <  50
+survey_samp_hist[survey_samp_mask]=np.nan
 # Kaine's smoothing technique
 survey_samp_smoothed = np.zeros((24*10,70))
 for i in range(24):
     survey_samp_smoothed[i*10:(i+1)*10,:] = survey_samp_hist[i,:]
-
-# also remove bins for which there was low sampling for survey, which would skew the statistics. We have chosen 1000 samples as lowest
-samp_mask =  (survey_samp_smoothed < 0.1*np.nanmedian(survey_samp_smoothed))
-# Print the inf mask
-print("\nLow sampling bin mask:")
-print(samp_mask)
-survey_samp_smoothed[samp_mask] = np.nan
 
 
 # CHORUS EVENTS
 # make histogram of chorus
 survey_chorus_hist = make_histogram(survey[(survey["chorus_pos"]==True) & (survey["Plasmapause"]=="Out") & (survey["Lstar"]>2.)])
 # remove zeroes
-zero_mask = survey_chorus_hist == 0
-survey_chorus_hist[zero_mask]=np.nan
+survey_chorus_mask = survey_chorus_hist < 50
+survey_chorus_hist[survey_chorus_mask]=np.nan
+# also remove bad sampling bins
+survey_chorus_hist[survey_samp_mask]=np.nan
+
+
 # Kaine's smoothing technique
 survey_chorus_smoothed = np.zeros((24*10,70))
 for i in range(24):
     survey_chorus_smoothed[i*10:(i+1)*10,:] = survey_chorus_hist[i,:]
-
-# also remove bins for which there was low sampling for survey, which would skew the statistics. We have chosen 1000 samples as lowest
-samp_mask_survey =  (survey_chorus_smoothed < 0.1*np.nanmedian(survey_chorus_smoothed))
-# Print the inf mask
-print("\nLow sampling bin mask:")
-print(samp_mask_survey)
-survey_chorus_smoothed[samp_mask_survey] = np.nan
 
 print("survey dists made...")
 
@@ -260,9 +245,8 @@ print("survey dists made...")
 survey_chorus_occurrence = survey_chorus_smoothed/survey_samp_smoothed
 
 
-
 # Now doing burst
-burst = xr.open_dataset('/data/emfisis_burst/wip/rablack75/rablack75/CountBurst/CSVs_flashA/curr_combined/full_13_18.nc')
+burst = xr.open_dataset('/data/emfisis_burst/wip/rablack75/rablack75/CountBurst/CSVs_flashA/curr_combined/full_13_19.nc')
 # Reduce 'chorus_flag' over the 'y' dimension, grouped by 'x'
 is_chorus = burst['chorus_flag'].any(dim='y')  # Check for any True in 'y'
 burst['isChorus'] = is_chorus
@@ -274,7 +258,7 @@ print("burst loaded...")
 #data_high =burst.where(burst["AE"]>=300)
 
 # Adding in MLAT range
-burst = burst.where(np.abs(burst["MLAT"])<6.)
+burst = burst.where(np.abs(burst["MLAT"])>=6.)
 # change MLT to radians for binning in polar coords
 burst["MLT_rads"] = 2*np.pi*burst["MLT"]/24
 
@@ -282,16 +266,17 @@ burst["MLT_rads"] = 2*np.pi*burst["MLT"]/24
 # make histogram
 burst_samp_hist = make_histogram_da(burst)
 print("burst sampling histogram made...")
-# remove zeroes
-zero_mask = burst_samp_hist == 0
-burst_samp_hist[zero_mask]=np.nan
+# remove low sampling
+burst_samp_mask = burst_samp_hist < 50
+burst_samp_hist[burst_samp_mask]=np.nan
+# also remove survey sampling
+burst_samp_hist[survey_samp_mask]=np.nan
 
 # Kaine's smoothing technique
 burst_samp_smoothed = np.zeros((24*10,70))
 for i in range(24):
     burst_samp_smoothed[i*10:(i+1)*10,:] = burst_samp_hist[i,:]
 
-burst_samp_smoothed[samp_mask] = np.nan
 
 # CHORUS EVENTS
 # make histogram
@@ -299,15 +284,19 @@ burst_chorus_hist = make_histogram_da(burst.where((burst["isChorus"]==True) & (b
 print("burst chorus histogram made...")
 
 # remove zeroes
-zero_mask = burst_chorus_hist == 0
-burst_chorus_hist[zero_mask]=np.nan
+burst_chorus_mask = burst_chorus_hist <  50
+burst_chorus_hist[burst_chorus_mask]=np.nan
+burst_chorus_hist[burst_samp_mask]=np.nan
+
+# also remove survey sampling
+burst_chorus_hist[survey_samp_mask]=np.nan
+
 
 # Kaine's smoothing technique
 burst_chorus_smoothed = np.zeros((24*10,70))
 for i in range(24):
     burst_chorus_smoothed[i*10:(i+1)*10,:] = burst_chorus_hist[i,:]
 
-burst_chorus_smoothed[samp_mask_survey] = np.nan
 
 # CHORUS OCCURRENCE (chorus events/all events)
 burst_chorus_occurrence = burst_chorus_smoothed/burst_samp_smoothed
@@ -325,7 +314,7 @@ names = ["Survey sampling","Burst sampling","Burst/survey sampling","Survey chor
 # save all data to a file so we can fix the plotting faster 
 # Write the array to disk
 print("saving data...")
-with open('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/data_fig1/LowMLATdata.txt', 'w') as outfile:
+with open('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/data_fig1/HighMLATdataV2.txt', 'w') as outfile:
     # I'm writing a header here just for the sake of readability
     # Any line starting with "#" will be ignored by numpy.loadtxt
     outfile.write(f'# arrays are: {names[:]}')
