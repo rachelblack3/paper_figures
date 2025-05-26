@@ -8,6 +8,8 @@ import matplotlib.colors as mcolors
 import matplotlib.dates as mdates
 import matplotlib.patches as patches
 
+from datetime import datetime
+
 # functions for making the power dial plots
 
 def make_histogram(dataframe):
@@ -99,7 +101,7 @@ def make_stat_histogram(dataframe,stat):
 
 
 # also read in the data from the last figure on sampling: low MLAT and high MLAT
-read_data = np.loadtxt('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/data_fig1/LowMLATdata.txt')
+read_data = np.loadtxt('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/data_fig1/HighMLATdataV2.txt')
 read_data = read_data.reshape((6,24*10,70))
 
 # read survey and burst chorus occurrence
@@ -110,50 +112,71 @@ print("reading survey...")
 survey = pd.read_csv('/data/emfisis_burst/wip/rablack75/rablack75/CountSurvey/AllSurveyPowerA_Version20240515_withchorus_pos.csv')
 # do the MLT fix
 survey["MLT_rads"] = 2*np.pi*survey["MLT"]/24
+# change all of the timestamps to datetime objects
+survey["Timestamp"] = survey["Timestamp"].apply(lambda x: datetime.strptime(x, '%Y-%m-%d %H:%M:%S'))
 
+# keep only between 2013-2019 for now
+time_condition = (survey["Timestamp"] > datetime(year=2012,month=12,day=31)) & (survey["Timestamp"] < datetime(year=2019,month=12,day=30))
+survey = survey[time_condition]
 # find the chorus in survey 
-survey_chorus = survey[(survey["chorus_pos"]==True) & (survey["Plasmapause"]=="Out") & (survey["Lstar"]>2.) & (np.abs(survey["MLAT"])<6.)]
+survey_chorus = survey[(survey["chorus_pos"]==True) & (survey["Plasmapause"]=="Out") & (survey["Lstar"]>2.) & (np.abs(survey["MLAT"])>=6.)]
 
 # get the power for these survey events and put into a hist
 survey_power_hist,mlt_l_dists = make_stat_histogram(survey_chorus,survey_chorus["Survey_integral"].values)
-
-zero_mask = survey_power_hist == 0
-survey_power_hist[zero_mask]=np.nan
+print("are these lens the same?",len(survey_chorus["Survey_integral"]),len(survey["Survey_integral"]))
 
 survey_power_smooth = np.zeros((24*10,70))
 for i in range(24):
     survey_power_smooth[i*10:(i+1)*10,:] = survey_power_hist[i,:]
     
 # also remove bins for which there was low sampling for survey, which would skew the statistics. We have chosen 1000 samples as lowest
-samp_mask = np.isnan(survey_chorus_occurrence)
-survey_power_smooth[samp_mask] = np.nan
+survey_samp_mask = np.isnan(survey_chorus_occurrence)
+survey_power_smooth[survey_samp_mask] = np.nan
 
 # Multiply the power by the chorus occurrence, so that we can get the effective power (?maybe different name)
 relative_survey_power = survey_power_smooth*survey_chorus_occurrence
 
 
 # Now onto burst power...
-burst_chor = xr.open_dataset('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/all_stats_mean_redidV12_fpefceADDED.nc')
+#burst_chor = xr.open_dataset('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/all_stats_mean_redidV12_fpefceADDED.nc')
+#burst_chor = xr.open_dataset('/data/emfisis_burst/wip/rablack75/rablack75/CountBurst/CSVs_flashA/curr_combined/full_13_19.nc')
+burst_chor = xr.open_dataset('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/burst_analysed/all_burst230525.nc')
+is_chorus = burst_chor['chorus_flag'].any(dim='y')  # Check for any True in 'y'
+burst_chor['isChorus'] = is_chorus
 
+chorus_result = burst_chor.where((burst_chor["isChorus"]==True))
+
+chorus_result["MLT_rads"] = 2*np.pi*chorus_result["MLT"]/24
+
+mean_burst_int = xr.DataArray(
+    data=np.full((chorus_result.sizes["x"]), np.nan),  # 2D: (x, z)
+    dims=("x"),
+    name="mean_burst_int"
+)
+
+for x in range(chorus_result.sizes["x"]):
+    if x % 1000 == 0:
+        print(f"{x} done")
+    mean_burst_int[x] = np.sum(chorus_result["total_power"][x,:])
+
+# save total power to chorus_result
+chorus_result["mean_burst_int"] = mean_burst_int
 # define latitude condition
-conditions = np.abs(burst_chor["MLAT"])<6.
+conditions = np.abs(chorus_result["MLAT"])>=6.
 
 # seperate out 'mean power' in each 6 seconds!
-mean_vals = np.where(conditions,burst_chor["mean_all"][:].values, np.nan)
+mean_vals = np.where(conditions,chorus_result["mean_burst_int"][:].values, np.nan)
 
 # make histogram
-mean_chorus_hist,mlt_l_dists = make_stat_histogram(burst_chor,mean_vals)
-
-zero_mask = mean_chorus_hist == 0
-mean_chorus_hist[zero_mask]=np.nan
+mean_chorus_hist,mlt_l_dists = make_stat_histogram(chorus_result,mean_vals)
 
 burst_power_smooth = np.zeros((24*10,70))
 for i in range(24):
     burst_power_smooth[i*10:(i+1)*10,:] = mean_chorus_hist[i,:]
     
 # also remove bins for which there was low sampling for survey, which would skew the statistics. We have chosen 1000 samples as lowest
-samp_mask = np.isnan(burst_chorus_occurrence)
-burst_power_smooth[samp_mask] = np.nan
+burst_samp_mask = np.isnan(burst_chorus_occurrence)
+burst_power_smooth[burst_samp_mask] = np.nan
 
 # Multiply the power by the chorus occurrence, so that we can get the effective power (?maybe different name)
 relative_burst_power = burst_power_smooth*burst_chorus_occurrence
@@ -165,7 +188,7 @@ names = ["Survey power (just chorus events)","Survey power (all events)","burst 
 # Write the array to disk
 
 print("saving data...")
-with open('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/data_fig2/LowMLATdata.txt', 'w') as outfile:
+with open('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/data_fig2/HighMLATdataV3.txt', 'w') as outfile:
     # I'm writing a header here just for the sake of readability
     # Any line starting with "#" will be ignored by numpy.loadtxt
     outfile.write(f'# arrays are: {names[:]}')
