@@ -207,12 +207,14 @@ def make_dial_plot(ax,histogram,colorbar,title):
 
 
 
-burst = xr.open_dataset('/data/emfisis_burst/wip/rablack75/rablack75/CountBurst/CSVs_flashA/curr_combined/full_12_19.nc')
+burst = xr.open_dataset('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/burst_analysed/all_burst230525.nc')
 # Reduce 'chorus_flag' over the 'y' dimension, grouped by 'x'
 is_chorus = burst['chorus_flag'].any(dim='y')  # Check for any True in 'y'
 burst['isChorus'] = is_chorus
 
-# name the variables for holding total_power in different bands
+chorus_result = burst.where((burst["isChorus"]),drop=True)
+
+# name the variables for holding total_power in different bands - survey
 exohiss_survey_power = xr.DataArray(
     data=np.full(burst.sizes["x"], np.nan),  # 2D: (x, z)
     dims=("x"),
@@ -227,6 +229,23 @@ upperband_survey_power = xr.DataArray(
     data=np.full(burst.sizes["x"], np.nan),  # 2D: (x, z)
     dims=("x"),
     name="upperband_survey_power"
+)
+
+# name the variables for holding total_power in different bands - burst
+exohiss_power = xr.DataArray(
+    data=np.full(burst.sizes["x"], np.nan),  # 2D: (x, z)
+    dims=("x"),
+    name="exohiss_power"
+)
+lowerband_power = xr.DataArray(
+    data=np.full(burst.sizes["x"], np.nan),  # 2D: (x, z)
+    dims=("x"),
+    name="lowerband_power"
+)
+upperband_power = xr.DataArray(
+    data=np.full(burst.sizes["x"], np.nan),  # 2D: (x, z)
+    dims=("x"),
+    name="upperband_power"
 )
 
 # name the variables for holding power peaks in different bands
@@ -266,6 +285,24 @@ upperband_mean = xr.DataArray(
         name="upperband_mean"
     )
 
+# name the variables for holding power medians in different bands
+exohiss_median= xr.DataArray(
+        data=np.full(burst.sizes["x"], np.nan),  # 1D: (x)
+        dims="x",
+        name="exohiss_median"
+    )
+
+lowerband_median = xr.DataArray(
+        data=np.full(burst.sizes["x"], np.nan),  # 1D: (x)
+        dims="x",
+        name="lowerband_median"
+    )
+
+upperband_median = xr.DataArray(
+        data=np.full(burst.sizes["x"], np.nan),  # 1D: (x)
+        dims="x",
+        name="upperband_median"
+    )
 
 # name the variables for holding power means in different bands
 exohiss_range = xr.DataArray(
@@ -323,30 +360,36 @@ upperband_mad = xr.DataArray(
     )
 
 band_ranges = [[0,1],[1,5],[5,-1]]
-bands = [exohiss_survey_power,lowerband_survey_power,upperband_survey_power]
+bands_survey = [exohiss_survey_power,lowerband_survey_power,upperband_survey_power]
+bands_burst = [exohiss_power,lowerband_power,upperband_power]
 
 peak_bands = [exohiss_peak,lowerband_peak,upperband_peak]
 mean_bands = [exohiss_mean,lowerband_mean,upperband_mean]
+median_bands = [exohiss_median,lowerband_median,upperband_median]
 range_bands = [exohiss_range,lowerband_range,upperband_range]
 iqr_bands = [exohiss_iqr,lowerband_iqr,upperband_iqr]
 mad_bands = [exohiss_mad,lowerband_mad,upperband_mad]
 names = ["exohiss_band", "lowerband", "upperband"]
 
-for variable, variable_mad, variable_mean, band_range, name in zip(bands, mad_bands, mean_bands, band_ranges, names):
+for variable_survey, variable_burst, variable_peak, variable_IQR, variable_mad, variable_mean, variable_median, band_range, name in zip(bands_survey,bands_burst,peak_bands,iqr_bands, mad_bands, mean_bands, median_bands, band_ranges, names):
     print(f'starting {name}...')
     print(f'Number of samples: {burst.sizes["x"]}')
 
-    # survey one
-    #for x in range(chorus_result.sizes["x"]):
-     #   if x % 1000 == 0:
-      #          print(f"{x} samples done for {name}")
+    # survey one & burst one
+    for x in range(chorus_result.sizes["x"]):
+        if x % 1000 == 0:
+                print(f"{x} samples done for {name}")
        
-       # variable[x] = np.sum(chorus_result["survey_power"][x,band_range[0]:band_range[1]])
+        variable_survey[x] = np.sum(chorus_result["survey_power"][x,band_range[0]:band_range[1]])
+        variable_burst[x] = np.sum(chorus_result["total_power"][x,band_range[0]:band_range[1]])
+     
+    # save band powers to chorus_result
+    chorus_result[f'{name}_power'] = variable_burst
+    chorus_result[f'{name}_power'].attrs["description"] = f'integrated power for given (burst, time) coordinate - {name} frequency range'
+    
+    chorus_result[[f'{name}_survey_power']] = variable_survey
+    chorus_result[f'{name}_survey_power'].attrs["description"] = f'survey integrated power for given (burst, time) coordinate - {name} frequency range'
 
-    # save total power to chorus_result
-    #chorus_result[f'{name}_survey_power'] = variable
-    # Add attributes (optional)
-    #chorus_result["burst_power"].attrs["description"] = "integrated power for given (burst, time) coordinate - full frequency range"
 
 
     # save total power to chorus_result
@@ -355,44 +398,39 @@ for variable, variable_mad, variable_mean, band_range, name in zip(bands, mad_ba
     #chorus_result["burst_power"].attrs["description"] = "integrated power for given (burst, time) coordinate - full frequency range"
 
     # find peak power in each band
-    for i in range(burst.sizes["x"]):
+    for i in range(chorus_result.sizes["x"]):
         #for each frequency band:
         if i % 1000 == 0:
             print(f"{i} peaks done for {name}")
-        dt_array = burst[f'{name}_power'].values[i,:]
+        dt_array = chorus_result[f'{name}_power'].values[i,:]
         dt_array = [np.nan if not np.isfinite(x) else x for x in dt_array]
         dt_array = [np.nan if x==0. else x for x in dt_array]
     
         
         variable_mad[i] = median_abs_deviation(dt_array,nan_policy='omit')
-        #variable_peak[i] = np.nanmax(dt_array)
-       # variable_range[i] = np.nanmax(dt_array) - np.nanmin(dt_array)
+        variable_peak[i] = np.nanmax(dt_array)
+        variable_IQR[i] = np.nanmax(dt_array) - np.nanmin(dt_array)
+        variable_mean[i] = np.nanmean(dt_array)
+        variable_median[i] = np.nanmedian(dt_array)
 
     
     # save total power to chorus_result
-    burst[[f'{name}_mad']] = variable_mad
-    # Add attributes (optional)
-    #chorus_result[[f'{name}_range']].attrs["description"] =  f'range of integrated power for given (burst, time) coordinate - {name} frequency range'
-
-    # Now find the mean power over each frequency range
-
-    #or i in range(chorus_result.sizes["x"]):
-        # for each frequency band:
-        #if i % 1000 == 0:
-           # print(f"{i} means done for {name}")
-       # dt_array = chorus_result[f'{name}_power'].values[i,:]
-        #dt_array = [np.nan if not np.isfinite(x) else x for x in dt_array]
-
-        #variable_mean[i] = np.nanmean(dt_array)
-        
-
-    # save total power to chorus_result
-    #chorus_result[f'{name}_mean'] = variable_mean
-    # Add attributes (optional)
-    #chorus_result[[f'{name}_mean']].attrs["description"] =  f'mean integrated power for given (burst, time) coordinate - {name} frequency range'
-
+    chorus_result[f'{name}_mad'] = variable_mad
+    chorus_result[f'{name}_mad'].attrs["description"] = f'Median averaged diff in int power for given (burst, time) coordinate - {name} frequency range'
+    
+    chorus_result[[f'{name}_peak']] = variable_peak
+    chorus_result[f'{name}_peak'].attrs["description"] = f'Peak int power for given (burst, time) coordinate - {name} frequency range'
+    
+    chorus_result[f'{name}_IQR'] = variable_IQR
+    chorus_result[f'{name}_IQR'].attrs["description"] = f'IQR in int power for given (burst, time) coordinate - {name} frequency range'
+    
+    chorus_result[[f'{name}_mean']] = variable_mean
+    chorus_result[f'{name}_mean'].attrs["description"] = f'Mean in int power for given (burst, time) coordinate - {name} frequency range'
+    
+    chorus_result[[f'{name}_median']] = variable_mean
+    chorus_result[f'{name}_median'].attrs["description"] = f'Median in int power for given (burst, time) coordinate - {name} frequency range'
+    
+    
     print(f'{name} done!')
 
-burst.to_netcdf('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/burst_analysed/all_burst230525.nc')
-
-print(lowerband_mean.values,lowerband_peak.values) 
+chorus_result.to_netcdf('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/burst_analysed/all_burst270525.nc')
