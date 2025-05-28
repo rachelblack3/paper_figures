@@ -233,18 +233,20 @@ upperband_survey_power = xr.DataArray(
 
 # name the variables for holding total_power in different bands - burst
 exohiss_power = xr.DataArray(
-    data=np.full(burst.sizes["x"], np.nan),  # 2D: (x, z)
-    dims=("x"),
+    data=np.full((chorus_result.sizes["x"],chorus_result.sizes["z"]), np.nan),  # 2D: (x, z)
+    dims=("x", "z"),
     name="exohiss_power"
 )
+
 lowerband_power = xr.DataArray(
-    data=np.full(burst.sizes["x"], np.nan),  # 2D: (x, z)
-    dims=("x"),
+    data=np.full((chorus_result.sizes["x"],chorus_result.sizes["z"]), np.nan),  # 2D: (x, z)
+    dims=("x", "z"),
     name="lowerband_power"
 )
+
 upperband_power = xr.DataArray(
-    data=np.full(burst.sizes["x"], np.nan),  # 2D: (x, z)
-    dims=("x"),
+    data=np.full((chorus_result.sizes["x"],chorus_result.sizes["z"]), np.nan),  # 2D: (x, z)
+    dims=("x", "z"),
     name="upperband_power"
 )
 
@@ -381,8 +383,11 @@ for variable_survey, variable_burst, variable_peak, variable_IQR, variable_mad, 
                 print(f"{x} samples done for {name}")
        
         variable_survey[x] = np.sum(chorus_result["survey_power"][x,band_range[0]:band_range[1]])
-        variable_burst[x] = np.sum(chorus_result["total_power"][x,band_range[0]:band_range[1]])
-     
+        
+        for z in range(chorus_result.sizes["z"]):
+
+            variable_burst[x,z] = np.sum(chorus_result["burst_power"][x,band_range[0]:band_range[1],z])
+            
     # save band powers to chorus_result
     chorus_result[f'{name}_power'] = variable_burst
     chorus_result[f'{name}_power'].attrs["description"] = f'integrated power for given (burst, time) coordinate - {name} frequency range'
