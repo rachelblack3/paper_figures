@@ -140,7 +140,7 @@ def make_total(conditions, dataset):
 # define subsets
 names = ["exohiss_band", "lowerband", "upperband"]
 AE_conds = [(chorus_result["AE"]<100),(chorus_result["AE"]>=100)&(chorus_result["AE"]<300),(chorus_result["AE"]>=300)]
-AE_names = [r'$AE<100$',r'$100<=AE<300$',r'$AE>=300$']
+AE_names = [r'$AE<100$',r'$100<=AE< 300$',r'$AE>=300$']
 MLAT_cond = (np.abs(chorus_result["MLAT"])<6.)
 
 # make list for D and p_subset
@@ -169,6 +169,7 @@ for j,name in enumerate(names):
     percent_over_100 = np.zeros(3)
     burst_over_nonlin = np.zeros(3)
     survey_over_nonlin = np.zeros(3)
+    iqr_over_10 = np.zeros(3)
 
     for i, (AE_cond, AE_name) in enumerate(zip(AE_conds, AE_names)):
 
@@ -280,6 +281,19 @@ for j,name in enumerate(names):
                 plt.axvline(np.log10(0.100), color='red', linestyle='dotted',label='100')
                 plt.axhline(y_cross, color='red', linestyle='dotted',label='Proportion at 100')
 
+            if (stat_name == r'$IQR_{norm}$'):
+                # find where cdf meets nonlinear threshold
+                # Find where y crosses the target value
+                target = np.log10(10)
+                # Find closest index
+                y_cross = np.interp(target, x_ecdf, Fx)
+
+                # save to array
+                iqr_over_10[i]=100*(1-y_cross)
+                print(y_cross,"for the iqr_norm >10")
+                plt.axvline(np.log10(0.100), color='red', linestyle='dotted',label='100')
+                plt.axhline(y_cross, color='red', linestyle='dotted',label='Proportion at 100')
+
             plt.title(f"ECDFs for {stat_name}, {name}, {AE_name}")
             plt.xlabel("Value")
             plt.ylabel("Cumulative Probability")
@@ -287,6 +301,6 @@ for j,name in enumerate(names):
             plt.savefig(f'/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/prep_fig4/CDFS/{name}_{AE_name}_{stat_name}.png')
 
         
-    thresholds = [percent_over_100,burst_over_nonlin,survey_over_nonlin]
+    thresholds = [percent_over_100,burst_over_nonlin,survey_over_nonlin,iqr_over_10]
 
     np.savetxt(f'/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/data_fig4/AE/VanAllenB/LowMLATThresholds_{name}.txt', thresholds, fmt="%.7f") 
