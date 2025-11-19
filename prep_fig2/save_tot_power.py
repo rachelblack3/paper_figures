@@ -81,79 +81,60 @@ def second_coeff(data):
     return skew_coeff*skew
 
 
-
-
-chorus_result = xr.open_dataset('/data/emfisis_burst/wip/rablack75/rablack75/CountBurst/CSVs_flashA/curr_combined/full_13_19.nc')
+# old one: chorus_result = xr.open_dataset('/data/emfisis_burst/wip/rablack75/rablack75/CountBurst/CSVs_flashBV2/curr_combined/full_13_19.nc')
+# new one:
+chorus_result = xr.open_dataset('/data/emfisis_burst/wip/rablack75/rablack75/ChorusinBurstandSurvey/B/full_12_19.nc')
 # Reduce 'chorus_flag' over the 'y' dimension, grouped by 'x'
-is_chorus = chorus_result['chorus_flag'].any(dim='y')  # Check for any True in 'y'
-chorus_result['isChorus'] = is_chorus
+#is_chorus = chorus_result['chorus_flag'].any(dim='y')  # Check for any True in 'y'
+#chorus_result['isChorus'] = is_chorus
 
-chorus_result = chorus_result.where((chorus_result["isChorus"]),drop=True)
+#chorus_result = chorus_result.where((chorus_result["isChorus"]),drop=True)
 
 total_power = xr.DataArray(
     data=np.full((chorus_result.sizes["x"],chorus_result.sizes["z"]), np.nan),  # 2D: (x, z)
     dims=("x", "z"),
     name="total_power"
 )
-
-print(chorus_result.sizes["x"])
-for x in range(chorus_result.sizes["x"]):
-    if x % 1000 == 0:
-        print(f"{x} done")
-    for z in range(chorus_result.sizes["z"]):
-        total_power[x,z] = np.sum(chorus_result["burst_power"][x,:,z])
-
-# save total power to chorus_result
-chorus_result["total_power"] = total_power
-# Add attributes (optional)
-chorus_result["total_power"].attrs["description"] = "integrated power for given (burst, time) coordinate - full frequency range"
-
-# find peak power in each sample (all freq)
-peak_all_f = np.zeros((chorus_result.sizes["x"]))
-for i in range(chorus_result.sizes["x"]):
-    # for each frequency band:
-    if i % 1000 == 0:
-        print(f"{i} done")
-    dt_array = chorus_result["total_power"].values[i,:]
-    dt_array = [np.nan if not np.isfinite(x) else x for x in dt_array]
-
-
-    peak_all_f[i] = np.nanmax(dt_array)
-
-total_peak = xr.DataArray(
-    data=np.full(chorus_result.sizes["x"], np.nan),  # 2D: (x, z)
-    dims="x",
-    name="total_power"
-)
-# save total power to chorus_result
-chorus_result["total_peak"] = total_peak
-# Add attributes (optional)
-chorus_result["total_peak"].attrs["description"] =  "max integrated power for given (burst) coordinate - full frequency range"
-
-# Now find the mean power over the full frequency range
-
-# find mean power in each sample (all freq)
-
 total_mean = xr.DataArray(
     data=np.full(chorus_result.sizes["x"], np.nan),  # 1D: (x)
     dims="x",
     name="total_mean"
 )
-for i in range(chorus_result.sizes["x"]):
-    # for each frequency band:
-    if i % 1000 == 0:
-        print(f"{i} done")
-    dt_array = chorus_result["total_power"].values[i,:]
-    dt_array = [np.nan if not np.isfinite(x) else x for x in dt_array]
+total_peak = xr.DataArray(
+    data=np.full(chorus_result.sizes["x"], np.nan),  # 2D: (x, z)
+    dims="x",
+    name="total_peak"
+)
 
-    total_mean[i] = np.nanmean(dt_array)
-    
+from tqdm import tqdm
+
+# If burst_power is very large, chunk by x
+total_power = np.empty((chorus_result.sizes["x"], chorus_result.sizes["z"]))
+chunk = 500  # adjust
+
+for i in tqdm(range(0, chorus_result.sizes["x"], chunk)):
+    sl = slice(i, i+chunk)
+    total_power[sl] = np.sum(chorus_result["burst_power"][sl], axis=1)
+clean = np.where(np.isfinite(total_power), total_power, np.nan)
+total_mean = np.nanmean(clean, axis=1)
+total_peak = np.nanmax(clean, axis=1)
 
 # save total power to chorus_result
-chorus_result["total_mean"] = total_mean
+chorus_result["total_power"] = (("x", "z"), total_power)
+# Add attributes (optional)
+chorus_result["total_power"].attrs["description"] = "integrated power for given (burst, time) coordinate - full frequency range"
+print("saved total_power")
+
+# save total power to chorus_result
+chorus_result["total_peak"] = (("x"), total_peak)
+# Add attributes (optional)
+chorus_result["total_peak"].attrs["description"] =  "max integrated power for given (burst) coordinate - full frequency range"
+print("saved total_peak")
+
+# save total power to chorus_result
+chorus_result["total_mean"] = (("x"), total_mean)
 # Add attributes (optional)
 chorus_result["total_mean"].attrs["description"] =  "mean integrated power for given (burst) coordinate - full frequency range"
+print("saved total_mean")
 
-
-
-chorus_result.to_netcdf('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/burst_analysed/all_burst230525.nc')
+chorus_result.to_netcdf('/data/emfisis_burst/wip/rablack75/rablack75/ChorusinBurstandSurvey/B/full_12_19_withTotalPower.nc')

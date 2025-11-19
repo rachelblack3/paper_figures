@@ -101,15 +101,18 @@ def make_stat_histogram(dataframe,stat):
 
 
 # also read in the data from the last figure on sampling: low MLAT and high MLAT
-read_data = np.loadtxt('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/data_fig1/HighMLATdataV2.txt')
-read_data = read_data.reshape((6,24*10,70))
+#read_data = np.loadtxt('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/data_fig1/LowMLATdataV2.txt')
+#read_data = read_data.reshape((6,24*10,70))
+names = ["Survey_sampling","Burst_sampling","Burst_survey_sampling","Survey_chorus","Burst_chorus","Burst_survey_chorus"]
+arrays = [np.loadtxt(f'/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/data_fig1/VanAllenB/LowMLATdataV1_{name}.txt') for name in names]
+read_data = np.stack(arrays)  # shape (6,240,70)
 
 # read survey and burst chorus occurrence
 survey_chorus_occurrence = read_data[3,:,:]/read_data[0,:,:]
 burst_chorus_occurrence = read_data[4,:,:]/read_data[1,:,:]
 
 print("reading survey...")
-survey = pd.read_csv('/data/emfisis_burst/wip/rablack75/rablack75/CountSurvey/AllSurveyPowerA_Version20240515_withchorus_pos.csv')
+survey = pd.read_csv('/data/emfisis_burst/wip/rablack75/rablack75/CountSurvey/AllSurveyPowerB_Version20250827.csv')
 # do the MLT fix
 survey["MLT_rads"] = 2*np.pi*survey["MLT"]/24
 # change all of the timestamps to datetime objects
@@ -119,7 +122,7 @@ survey["Timestamp"] = survey["Timestamp"].apply(lambda x: datetime.strptime(x, '
 time_condition = (survey["Timestamp"] > datetime(year=2012,month=12,day=31)) & (survey["Timestamp"] < datetime(year=2019,month=12,day=30))
 survey = survey[time_condition]
 # find the chorus in survey 
-survey_chorus = survey[(survey["chorus_pos"]==True) & (survey["Plasmapause"]=="Out") & (survey["Lstar"]>2.) & (np.abs(survey["MLAT"])>=6.)]
+survey_chorus = survey[(survey["chorus_pos"]==True) & (survey["Plasmapause"]=="Out") & (survey["Lstar"]>2.) & (np.abs(survey["MLAT"])<6.)]
 
 # get the power for these survey events and put into a hist
 survey_power_hist,mlt_l_dists = make_stat_histogram(survey_chorus,survey_chorus["Survey_integral"].values)
@@ -140,7 +143,7 @@ relative_survey_power = survey_power_smooth*survey_chorus_occurrence
 # Now onto burst power...
 #burst_chor = xr.open_dataset('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/all_stats_mean_redidV12_fpefceADDED.nc')
 #burst_chor = xr.open_dataset('/data/emfisis_burst/wip/rablack75/rablack75/CountBurst/CSVs_flashA/curr_combined/full_13_19.nc')
-burst_chor = xr.open_dataset('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/burst_analysed/all_burst230525.nc')
+burst_chor = xr.open_dataset('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/burst_analysed/all_burstB270725.nc')
 is_chorus = burst_chor['chorus_flag'].any(dim='y')  # Check for any True in 'y'
 burst_chor['isChorus'] = is_chorus
 
@@ -157,50 +160,67 @@ mean_burst_int = xr.DataArray(
 for x in range(chorus_result.sizes["x"]):
     if x % 1000 == 0:
         print(f"{x} done")
-    mean_burst_int[x] = np.sum(chorus_result["total_power"][x,:])
+    mean_burst_int[x] = np.nanmean(chorus_result["total_power"][x,:])
 
 # save total power to chorus_result
 chorus_result["mean_burst_int"] = mean_burst_int
+chorus_result.to_netcdf('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/burst_analysed/burstB270725_justChorus.nc')
 # define latitude condition
-conditions = np.abs(chorus_result["MLAT"])>=6.
+conditions = np.abs(chorus_result["MLAT"])<6.
 
 # seperate out 'mean power' in each 6 seconds!
 mean_vals = np.where(conditions,chorus_result["mean_burst_int"][:].values, np.nan)
 
+# get corresponding survey vals: # survey one & burst one
+variable_survey = xr.DataArray(
+    data=np.full(chorus_result.sizes["x"], np.nan),  # 2D: (x, z)
+    dims=("x"),
+    name="survey_power"
+)
+for x in range(chorus_result.sizes["x"]):
+    if x % 1000 == 0:
+            print(f"{x} samples done")
+    
+    variable_survey[x] = np.sum(chorus_result["survey_power"][x,:])
+
+chorus_result["tot_survey"] = variable_survey
+
+survey_vals = np.where(conditions,chorus_result["tot_survey"][:].values, np.nan)
+
 # make histogram
 mean_chorus_hist,mlt_l_dists = make_stat_histogram(chorus_result,mean_vals)
+survey_for_burst_chorus_hist,mlt_l_dists = make_stat_histogram(chorus_result,survey_vals)
 
+survey_for_burst_smooth = np.zeros((24*10,70))
 burst_power_smooth = np.zeros((24*10,70))
 for i in range(24):
     burst_power_smooth[i*10:(i+1)*10,:] = mean_chorus_hist[i,:]
+    survey_for_burst_smooth[i*10:(i+1)*10,:] = survey_for_burst_chorus_hist[i,:]
     
 # also remove bins for which there was low sampling for survey, which would skew the statistics. We have chosen 1000 samples as lowest
 burst_samp_mask = np.isnan(burst_chorus_occurrence)
 burst_power_smooth[burst_samp_mask] = np.nan
+survey_for_burst_smooth[burst_samp_mask] = np.nan
 
 # Multiply the power by the chorus occurrence, so that we can get the effective power (?maybe different name)
 relative_burst_power = burst_power_smooth*burst_chorus_occurrence
 
-dists = [survey_power_smooth,relative_survey_power,burst_power_smooth,relative_burst_power]
-names = ["Survey power (just chorus events)","Survey power (all events)","burst power (just chorus events)","burst power (all events)"]
+dists = [survey_power_smooth,relative_survey_power,burst_power_smooth,relative_burst_power,survey_for_burst_smooth]
+names = ["Survey_power_just_chorus_events","Survey_power_all_events","burst_power_just_chorus_events","burst_power_all_events","survey_for_burst"]
 
 # save all data to a file so we can fix the plotting faster 
 # Write the array to disk
 
-print("saving data...")
-with open('/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/data_fig2/HighMLATdataV3.txt', 'w') as outfile:
-    # I'm writing a header here just for the sake of readability
-    # Any line starting with "#" will be ignored by numpy.loadtxt
-    outfile.write(f'# arrays are: {names[:]}')
-    
-    # Iterating through a ndimensional array produces slices along
-    # the last axis. This is equivalent to data[i,:,:] in this case
-    for dist,name in zip(dists,names):
+# Iterating through a ndimensional array produces slices along
+# the last axis. This is equivalent to data[i,:,:] in this case
+for dist,name in zip(dists,names):
 
-        # The formatting string indicates that I'm writing out
-        # the values in left-justified columns 7 characters in width
-        # with 2 decimal places.  
-        np.savetxt(outfile, dist)
 
-        # Writing out a break to indicate different dists...
-        #outfile.write(f'{name}')
+# The formatting string indicates that I'm writing out
+# the values in left-justified columns 7 characters in width
+# with 2 decimal places. 
+
+    np.savetxt(f'/data/emfisis_burst/wip/rablack75/rablack75/read_stats/paper_figures/data_fig2/VanAllenB/LowMLATdataV1_{name}.txt', dist) 
+
+    # Writing out a break to indicate different dists...
+    #outfile.write(f'{name}')
